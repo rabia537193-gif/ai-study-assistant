@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Study Assistant using RAG</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .container {
+            max-width: 900px;
+            margin-top: 40px;
+            margin-bottom: 50px;
+        }
+        .card {
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+        .output-box {
+            background-color: #fcfcfc;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            min-height: 60px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 class="text-center mb-4 fw-bold text-primary">📚 AI Study Assistant using RAG</h2>
+
+    <!-- Step 1: Upload Section -->
+    <div class="card p-4">
+        <h5 class="fw-bold mb-3">1. Upload Python Chapter PDFs</h5>
+        <div class="mb-3">
+            <input class="form-control" type="file" id="pdfFiles" multiple accept=".pdf">
+        </div>
+        <button class="btn btn-primary w-100 fw-semibold" onclick="uploadFiles()">Upload & Generate Embeddings</button>
+        <div id="uploadStatus" class="mt-3 text-success fw-bold"></div>
+    </div>
+
+    <!-- Step 2: Query Section -->
+    <div class="card p-4">
+        <h5 class="fw-bold mb-3">2. Ask a Question</h5>
+        <div class="mb-3">
+            <input type="text" id="questionInput" class="form-control" placeholder="e.g., What is python?">
+        </div>
+        <button class="btn btn-success w-100 fw-semibold mb-4" onclick="askQuestion()">Ask AI Assistant</button>
+
+        <label class="fw-bold mb-1">AI Answer:</label>
+        <div id="answerBox" class="output-box mb-3 text-dark"></div>
+
+        <label class="fw-bold mb-1">Retrieved Context Chunks:</label>
+        <div id="chunksBox" class="output-box text-muted"></div>
+    </div>
+</div>
+
+<script>
+async function uploadFiles() {
+    const fileInput = document.getElementById("pdfFiles");
+    const statusDiv = document.getElementById("uploadStatus");
+    
+    if (fileInput.files.length === 0) {
+        alert("Please select one or more PDF files first.");
+        return;
+    }
+
+    const formData = new FormData();
+    for (let i = 0; i < fileInput.files.length; i++) {
+        formData.append("files", fileInput.files[i]);
+    }
+
+    statusDiv.className = "mt-3 text-info fw-bold";
+    statusDiv.innerText = "Processing files and generating embeddings... Please wait.";
+
+    try {
+        const response = await fetch("/upload", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            const errorText = typeof data.detail === 'object' ? JSON.stringify(data.detail) : (data.detail || JSON.stringify(data));
+            statusDiv.className = "mt-3 text-danger fw-bold";
+            statusDiv.innerText = "Upload Error: " + errorText;
+            return;
+        }
+
+        statusDiv.className = "mt-3 text-success fw-bold";
+        statusDiv.innerText = data.message || "Successfully processed files!";
+    } catch (err) {
+        statusDiv.className = "mt-3 text-danger fw-bold";
+        statusDiv.innerText = "Fetch Error: " + err.message;
+    }
+}
+
+async function askQuestion() {
+    const questionInput = document.getElementById("questionInput").value.trim();
+    const answerBox = document.getElementById("answerBox");
+    const chunksBox = document.getElementById("chunksBox");
+
+    if (!questionInput) {
+        alert("Please enter a question.");
+        return;
+    }
+
+    answerBox.innerText = "Thinking...";
+    chunksBox.innerText = "";
+    
+    try {
+        const response = await fetch("/ask", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ question: questionInput })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            const errorText = typeof data.detail === 'object' ? JSON.stringify(data.detail) : (data.detail || JSON.stringify(data));
+            answerBox.innerText = "Backend Error: " + errorText;
+            return;
+        }
+
+        answerBox.innerText = data.answer || "No response received.";
+        if (data.context && data.context.length > 0) {
+            chunksBox.innerText = data.context.join("\n\n---\n\n");
+        } else {
+            chunksBox.innerText = "No specific context retrieved.";
+        }
+    } catch (err) {
+        answerBox.innerText = "Fetch Error: " + err.message;
+    }
+}
+</script>
+
+</body>
+</html>
